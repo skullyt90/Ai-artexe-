@@ -1,9 +1,276 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My AI Site</title>
+<meta charset="UTF-8">
+<title>AI Studio Pro</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: system-ui, Arial;
+    background: radial-gradient(circle at top, #0f172a, #020617);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* MAIN CARD */
+.card {
+    width: 420px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(14px);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+/* TITLE */
+h2 {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* TABS */
+.tabs {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.tab {
+    flex: 1;
+    padding: 10px;
+    margin: 3px;
+    text-align: center;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.tab.active {
+    background: #3b82f6;
+}
+
+/* INPUTS */
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+/* DROP AREA */
+.drop {
+    border: 2px dashed rgba(255,255,255,0.3);
+    padding: 15px;
+    border-radius: 12px;
+    text-align: center;
+    margin: 10px 0;
+    cursor: pointer;
+}
+
+/* BUTTON */
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 10px;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+button:hover {
+    background: #2563eb;
+}
+
+/* IMAGE */
+img {
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 12px;
+    display: none;
+}
+
+/* LOADER OVERLAY */
+.overlay {
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,0.6);
+    display:none;
+    justify-content:center;
+    align-items:center;
+}
+
+.loader {
+    border: 5px solid #334155;
+    border-top: 5px solid #3b82f6;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+</style>
 </head>
+
 <body>
-  <h1>Website Live 🚀</h1>
+
+<div class="card">
+
+    <h2>🎨 AI Studio Pro</h2>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('gen')">Generate</div>
+        <div class="tab" onclick="switchTab('edit')">Edit</div>
+    </div>
+
+    <!-- GENERATE -->
+    <div id="gen">
+        <textarea id="prompt" placeholder="Enter prompt..."></textarea>
+        <button onclick="generate()">Generate Image</button>
+    </div>
+
+    <!-- EDIT -->
+    <div id="edit" style="display:none;">
+        <div class="drop" onclick="fileInput.click()">📤 Upload Image</div>
+        <input type="file" id="fileInput" hidden>
+        <textarea id="editPrompt" placeholder="Describe edit..."></textarea>
+        <button onclick="editImage()">Edit Image</button>
+    </div>
+
+    <img id="result">
+
+    <button id="downloadBtn" style="display:none;" onclick="downloadImage()">Download</button>
+
+</div>
+
+<!-- LOADING -->
+<div class="overlay" id="overlay">
+    <div class="loader"></div>
+</div>
+
+<script>
+
+const API_KEY = "hf__VYgZGaEuMauOduuzAkXIsqFIqHgPyQWseQ";
+
+let imageURL = "";
+let uploadedImage = null;
+
+/* TAB SWITCH */
+function switchTab(tab){
+    document.getElementById("gen").style.display = tab==="gen"?"block":"none";
+    document.getElementById("edit").style.display = tab==="edit"?"block":"none";
+}
+
+/* FILE */
+document.getElementById("fileInput").onchange = e=>{
+    uploadedImage = e.target.files[0];
+}
+
+/* LOADER */
+function showLoader(show){
+    document.getElementById("overlay").style.display = show?"flex":"none";
+}
+
+/* GENERATE */
+async function generate(){
+
+    let prompt = document.getElementById("prompt").value;
+
+    showLoader(true);
+
+    const res = await fetch(
+        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2",
+        {
+            method:"POST",
+            headers:{
+                "Authorization":"Bearer "+API_KEY,
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({inputs:prompt})
+        }
+    );
+
+    const blob = await res.blob();
+    imageURL = URL.createObjectURL(blob);
+
+    showLoader(false);
+    showImage();
+}
+
+/* EDIT */
+async function editImage(){
+
+    if(!uploadedImage) return alert("Upload image!");
+
+    let prompt = document.getElementById("editPrompt").value;
+
+    const reader = new FileReader();
+
+    reader.onload = async function(){
+
+        showLoader(true);
+
+        const res = await fetch(
+            "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+            {
+                method:"POST",
+                headers:{
+                    "Authorization":"Bearer "+API_KEY,
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    inputs:{
+                        image:reader.result,
+                        prompt:prompt
+                    }
+                })
+            }
+        );
+
+        const blob = await res.blob();
+        imageURL = URL.createObjectURL(blob);
+
+        showLoader(false);
+        showImage();
+    }
+
+    reader.readAsDataURL(uploadedImage);
+}
+
+/* SHOW IMAGE */
+function showImage(){
+    const img = document.getElementById("result");
+    img.src = imageURL;
+    img.style.display = "block";
+    document.getElementById("downloadBtn").style.display = "block";
+}
+
+/* DOWNLOAD */
+function downloadImage(){
+    const a = document.createElement("a");
+    a.href = imageURL;
+    a.download = "ai-studio.png";
+    a.click();
+}
+
+</script>
+
 </body>
 </html>
